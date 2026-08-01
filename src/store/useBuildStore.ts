@@ -124,7 +124,7 @@ export const useBuildStore = create<BuildState>((set, get) => ({
       let closestDist = Infinity;
       for (const obj of s.objects) {
         const dist = Math.hypot(obj.lat - lat, obj.lng - lng);
-        if (dist < 0.0005 && dist < closestDist) {
+        if (dist < 0.002 && dist < closestDist) {
           closest = obj;
           closestDist = dist;
         }

@@ -181,49 +181,52 @@ export default function App() {
     const client = new SimulationClient(wsUrl);
 
     client.connect().then(() => {
-      store.setConnected(true);
-      store.setRole(role);
-      store.setOperatorName(name);
-      store.setSelectedScenario('Custom');
+      const s = useStore.getState();
+      s.setConnected(true);
+      s.setRole(role);
+      s.setOperatorName(name);
+      s.setSelectedScenario('Custom');
 
-      // Send world definition to server
-      client.send({ type: 'set_world', world });
-
+      // Register message handler BEFORE sending set_world
       client.on((msg) => {
+        const st = useStore.getState();
         switch (msg.type) {
           case 'snapshot':
-            store.setSnapshot(msg as Snapshot);
+            st.setSnapshot(msg as Snapshot);
             engineRef.current?.updateSnapshot(msg as Snapshot);
-            store.setVisibleAgents(engineRef.current?.getVisibleAgents() ?? 0);
+            st.setVisibleAgents(engineRef.current?.getVisibleAgents() ?? 0);
             break;
           case 'metrics':
-            store.setMetrics(msg as ServerMetrics);
+            st.setMetrics(msg as ServerMetrics);
             break;
           case 'joined':
-            store.setSessionId(msg.session_id);
-            store.setOperatorsOnline(msg.operators);
+            st.setSessionId(msg.session_id);
+            st.setOperatorsOnline(msg.operators);
             break;
           case 'operator_joined':
-            store.setOperatorsOnline(store.operatorsOnline + 1);
+            st.setOperatorsOnline(st.operatorsOnline + 1);
             break;
           case 'operator_left':
-            store.setOperatorsOnline(Math.max(0, store.operatorsOnline - 1));
+            st.setOperatorsOnline(Math.max(0, st.operatorsOnline - 1));
             break;
           case 'action_log':
-            store.addActionLog(msg as ActionLogEntry);
+            st.addActionLog(msg as ActionLogEntry);
             break;
           case 'report':
-            store.setReport(msg as ScenarioReport);
+            st.setReport(msg as ScenarioReport);
             break;
         }
       });
+
+      // Send world definition to server
+      client.send({ type: 'set_world', world });
 
       client.onLatency((latency) => {
         store.setLatency(latency);
       });
     }).catch(() => {
       console.warn('Could not connect to server, running in offline mode');
-      store.setConnected(false);
+      useStore.getState().setConnected(false);
       startOfflineSimulation();
     });
 
@@ -291,10 +294,11 @@ export default function App() {
         },
       };
 
-      store.setSnapshot(snapshot);
+      const st = useStore.getState();
+      st.setSnapshot(snapshot);
       engineRef.current?.updateSnapshot(snapshot);
-      store.setVisibleAgents(engineRef.current?.getVisibleAgents() ?? 0);
-      store.setMetrics({
+      st.setVisibleAgents(engineRef.current?.getVisibleAgents() ?? 0);
+      st.setMetrics({
         ticks_per_second: 20,
         server_calc_time_us: 100,
         snapshot_size_bytes: 0,

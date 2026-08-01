@@ -167,6 +167,11 @@ export function BuildMode({ onRun }: Props) {
     mapRef.current = map;
 
     setTimeout(() => map.invalidateSize(), 100);
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    resizeObserver.observe(map.getContainer());
   }, []);
 
   useEffect(() => {
@@ -190,13 +195,12 @@ export function BuildMode({ onRun }: Props) {
           // Update barrier line endpoints
           const halfLen = obj.capacity / 2;
           const rad = obj.rotation * Math.PI / 180;
-          const dx = Math.cos(rad + Math.PI / 2) * halfLen;
-          const dz = Math.sin(rad + Math.PI / 2) * halfLen;
-          const center = store.mapCenter;
-          const lat1 = center.lat + (obj.z - dz) / 111320;
-          const lng1 = center.lng + (obj.x - dx) / (111320 * Math.cos(center.lat * Math.PI / 180));
-          const lat2 = center.lat + (obj.z + dz) / 111320;
-          const lng2 = center.lng + (obj.x + dx) / (111320 * Math.cos(center.lat * Math.PI / 180));
+          const dx = Math.cos(rad) * halfLen;
+          const dz = Math.sin(rad) * halfLen;
+          const lat1 = obj.lat - dz / 111320;
+          const lng1 = obj.lng - dx / (111320 * Math.cos(obj.lat * Math.PI / 180));
+          const lat2 = obj.lat + dz / 111320;
+          const lng2 = obj.lng + dx / (111320 * Math.cos(obj.lat * Math.PI / 180));
           layer.setLatLngs([[lat1, lng1], [lat2, lng2]]);
         } else if (!(obj.type === 'barrier') && layer instanceof L.Marker) {
           layer.setLatLng([obj.lat, obj.lng]);
@@ -206,19 +210,22 @@ export function BuildMode({ onRun }: Props) {
 
         if (obj.type === 'barrier') {
           // Draw barrier as polyline
-          const halfLen = obj.capacity / 2;
+          const halfLen = (obj.capacity || 10) / 2;
           const rad = obj.rotation * Math.PI / 180;
-          const dx = Math.cos(rad + Math.PI / 2) * halfLen;
-          const dz = Math.sin(rad + Math.PI / 2) * halfLen;
-          const center = store.mapCenter;
-          const lat1 = center.lat + (obj.z - dz) / 111320;
-          const lng1 = center.lng + (obj.x - dx) / (111320 * Math.cos(center.lat * Math.PI / 180));
-          const lat2 = center.lat + (obj.z + dz) / 111320;
-          const lng2 = center.lng + (obj.x + dx) / (111320 * Math.cos(center.lat * Math.PI / 180));
+          const dx = Math.cos(rad) * halfLen;
+          const dz = Math.sin(rad) * halfLen;
+          const lat1 = obj.lat - dz / 111320;
+          const lng1 = obj.lng - dx / (111320 * Math.cos(obj.lat * Math.PI / 180));
+          const lat2 = obj.lat + dz / 111320;
+          const lng2 = obj.lng + dx / (111320 * Math.cos(obj.lat * Math.PI / 180));
           const line = L.polyline([[lat1, lng1], [lat2, lng2]], {
             color: colour, weight: 4, opacity: 0.8,
           }).addTo(map);
           line.bindTooltip('barrier', { permanent: false, direction: 'top' });
+          line.on('contextmenu', (e: L.LeafletMouseEvent) => {
+            L.DomEvent.preventDefault(e.originalEvent);
+            useBuildStore.getState().removeObject(obj.id);
+          });
           existing.set(obj.id, line);
         } else {
           const sz = getMarkerSize(obj.type);
@@ -231,6 +238,10 @@ export function BuildMode({ onRun }: Props) {
           const marker = L.marker([obj.lat, obj.lng], { icon }).addTo(map);
           marker.bindTooltip(obj.type.replace(/_/g, ' '), { permanent: false, direction: 'top' });
           marker.bindPopup(getObjectPopupHtml(obj), { closeButton: true, maxWidth: 250 });
+          marker.on('contextmenu', (e: L.LeafletMouseEvent) => {
+            L.DomEvent.preventDefault(e.originalEvent);
+            useBuildStore.getState().removeObject(obj.id);
+          });
           existing.set(obj.id, marker);
         }
       }

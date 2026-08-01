@@ -132,6 +132,12 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
 
     mapRef.current = map;
     setTimeout(() => map.invalidateSize(), 100);
+
+    // Invalidate map size when container resizes
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    resizeObserver.observe(map.getContainer());
   }, []);
 
   // No-data warning timer
@@ -221,10 +227,12 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
       if (obj.type === 'barrier') {
         const halfLen = (obj.capacity || 10) / 2;
         const rad = obj.rotation * Math.PI / 180;
-        const dx = Math.cos(rad + Math.PI / 2) * halfLen;
-        const dz = Math.sin(rad + Math.PI / 2) * halfLen;
-        const [lat1, lng1] = worldToLatLng(obj.x - dx, obj.z - dz, store.mapCenter);
-        const [lat2, lng2] = worldToLatLng(obj.x + dx, obj.z + dz, store.mapCenter);
+        const dx = Math.cos(rad) * halfLen;
+        const dz = Math.sin(rad) * halfLen;
+        const lat1 = obj.lat - dz / 111320;
+        const lng1 = obj.lng - dx / (111320 * Math.cos(obj.lat * Math.PI / 180));
+        const lat2 = obj.lat + dz / 111320;
+        const lng2 = obj.lng + dx / (111320 * Math.cos(obj.lat * Math.PI / 180));
 
         L.polyline([[lat1, lng1], [lat2, lng2]], {
           color: colour, weight: 4, opacity: 0.8,
