@@ -28,3 +28,6 @@ Thumbs.db
 
 # Vite cache
 .vite/
+
+# Project spec
+SPECIFICATION.md
