@@ -217,4 +217,4 @@ Frontend output is in `dist/`. Rust binary is in `server/target/release/crowdflu
 
 ## Licence
 
-This project is built as a technical portfolio demonstration.
+MIT Licence. See [LICENSE](./LICENSE) for the full text.
