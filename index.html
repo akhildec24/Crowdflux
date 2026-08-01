@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Primary Meta Tags -->
+    <title>CrowdFlux — Real-Time Crowd & Emergency Simulation</title>
+    <meta name="title" content="CrowdFlux — Real-Time Crowd & Emergency Simulation" />
+    <meta name="description" content="CrowdFlux is an interactive browser-based simulation for modelling how thousands of people move through festivals, transport hubs, and public spaces. Built with Rust, WebSocket, and WebGL for real-time crowd dynamics, pathfinding, and emergency evacuation planning." />
+    <meta name="keywords" content="crowd simulation, emergency evacuation, crowd dynamics, pedestrian flow, festival safety, transport hub simulation, real-time simulation, Rust server, WebGL, pathfinding, crowd density, crowd management, event safety planning" />
+    <meta name="author" content="CrowdFlux" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0a0e14" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://crowdflux.app/" />
+    <meta property="og:title" content="CrowdFlux — Real-Time Crowd & Emergency Simulation" />
+    <meta property="og:description" content="Interactive browser-based crowd simulation with thousands of autonomous agents. Model festivals, transport hubs, and emergency evacuations in real time. Built with Rust + WebGL." />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta property="og:site_name" content="CrowdFlux" />
+    <meta property="og:locale" content="en_GB" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CrowdFlux — Real-Time Crowd & Emergency Simulation" />
+    <meta name="twitter:description" content="Interactive browser-based crowd simulation with thousands of autonomous agents. Model festivals, transport hubs, and emergency evacuations in real time." />
+    <meta name="twitter:image" content="/favicon.svg" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "CrowdFlux",
+      "description": "Real-time multiplayer crowd and emergency simulation for modelling how people move through festivals, transport hubs, and public spaces.",
+      "applicationCategory": "SimulationApplication",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires WebGL 2.0 and WebSocket support",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "GBP"
+      },
+      "featureList": [
+        "Thousands of autonomous agents with real-time pathfinding",
+        "Interactive crowd density heatmap visualisation",
+        "Emergency evacuation simulation",
+        "Multiplayer operator roles",
+        "Live barrier and entrance management",
+        "Deterministic simulation with Rust backend",
+        "OpenStreetMap integration for real-world locations"
+      ],
+      "keywords": "crowd simulation, emergency evacuation, crowd dynamics, pedestrian flow"
+    }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+      #root { width: 100%; height: 100%; }
+      #loading-screen {
+        position: fixed; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; background: #000;
+        color: #666; font-family: 'Inter', -apple-system, sans-serif;
+        z-index: 9999; transition: opacity 0.4s ease;
+      }
+      #loading-screen.hidden { opacity: 0; pointer-events: none; }
+      #loading-screen .logo {
+        font-size: 22px; font-weight: 500; color: #fff;
+        letter-spacing: 4px; margin-bottom: 24px; text-transform: uppercase;
+      }
+      #loading-screen .sub { font-size: 11px; color: #555; letter-spacing: 1px; text-transform: uppercase; }
+      #loading-screen .spinner {
+        width: 24px; height: 24px; border: 1.5px solid #1a1a1a; border-top-color: #fff;
+        border-radius: 50%; animation: spin 0.9s linear infinite; margin-bottom: 20px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div id="loading-screen">
+      <div class="spinner"></div>
+      <div class="logo">CrowdFlux</div>
+      <div class="sub">Initialising</div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
