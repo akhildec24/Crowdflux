@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -6,6 +6,7 @@ import {
   ShieldAlert, CircleX, Eraser, Trash2, Play, Upload, Download, Search,
 } from 'lucide-react';
 import { useBuildStore, DEFAULT_CAPACITIES, type PlaceableType } from '../store/useBuildStore';
+import { getMarkerIcon, getMarkerSize, getObjectPopupHtml } from '../utils/mapIcons';
 
 const TOOL_DEFS: { type: PlaceableType; label: string; icon: React.ReactNode; colour: string }[] = [
   { type: 'entrance', label: 'Entrance', icon: <DoorOpen size={16} />, colour: '#3a8a5a' },
@@ -43,6 +44,8 @@ export function BuildMode({ onRun }: Props) {
   const barrierStartRef = useRef<{ lat: number; lng: number } | null>(null);
   const tempLineRef = useRef<L.Layer | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const [mapOpacity, setMapOpacity] = useState(0.6);
   const store = useBuildStore();
 
   useEffect(() => {
@@ -55,10 +58,12 @@ export function BuildMode({ onRun }: Props) {
       attributionControl: true,
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
+      opacity: 0.6,
     }).addTo(map);
+    tileLayerRef.current = tiles;
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -216,17 +221,16 @@ export function BuildMode({ onRun }: Props) {
           line.bindTooltip('barrier', { permanent: false, direction: 'top' });
           existing.set(obj.id, line);
         } else {
-          const sizeMap: Record<string, number> = { stage: 20, entrance: 16, exit: 16, emergency_exit: 16 };
-          const sz = sizeMap[obj.type] ?? 12;
-          const label = obj.type.replace(/_/g, ' ');
+          const sz = getMarkerSize(obj.type);
           const icon = L.divIcon({
             className: 'build-marker',
-            html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${colour};border:2px solid #000;box-shadow:0 0 6px ${colour}99;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:bold;">${label[0].toUpperCase()}</div>`,
+            html: getMarkerIcon(obj.type, sz),
             iconSize: [sz, sz],
             iconAnchor: [sz / 2, sz / 2],
           });
           const marker = L.marker([obj.lat, obj.lng], { icon }).addTo(map);
-          marker.bindTooltip(label, { permanent: false, direction: 'top' });
+          marker.bindTooltip(obj.type.replace(/_/g, ' '), { permanent: false, direction: 'top' });
+          marker.bindPopup(getObjectPopupHtml(obj), { closeButton: true, maxWidth: 250 });
           existing.set(obj.id, marker);
         }
       }
@@ -328,6 +332,24 @@ export function BuildMode({ onRun }: Props) {
               <span className="tool-label">{def.label}</span>
             </button>
           ))}
+        </div>
+
+        <div className="palette-divider" />
+
+        <div className="palette-section">
+          <label>Map Opacity: {Math.round(mapOpacity * 100)}%</label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.1}
+            value={mapOpacity}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setMapOpacity(v);
+              tileLayerRef.current?.setOpacity(v);
+            }}
+          />
         </div>
 
         <div className="palette-divider" />

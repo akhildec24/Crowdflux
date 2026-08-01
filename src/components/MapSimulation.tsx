@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Pause, Play, AlertTriangle, Users, Activity, TrendingUp, Flame, ArrowRight } from 'lucide-react';
 import { useBuildStore, type PlacedObject } from '../store/useBuildStore';
+import { getMarkerIcon, getMarkerSize, getObjectPopupHtml } from '../utils/mapIcons';
 import type { Snapshot, ServerMetrics } from '../net/types';
 
 const METERS_PER_LAT = 111320;
@@ -96,8 +97,10 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
   const agentLayerRef = useRef<L.LayerGroup | null>(null);
   const densityLayerRef = useRef<L.LayerGroup | null>(null);
   const incidentLayerRef = useRef<L.LayerGroup | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [showFlow, setShowFlow] = useState(true);
+  const [mapOpacity, setMapOpacity] = useState(0.4);
   const [noDataWarning, setNoDataWarning] = useState(false);
   const store = useBuildStore();
 
@@ -112,10 +115,12 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
       attributionControl: true,
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
+      opacity: 0.4,
     }).addTo(map);
+    tileLayerRef.current = tiles;
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -196,6 +201,19 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
 
     layer.clearLayers();
 
+    // Count agents near each object (within 30m)
+    const agentCounts = new Map<string, number>();
+    if (snapshot?.agents) {
+      for (const obj of store.objects) {
+        let count = 0;
+        for (const agent of snapshot.agents) {
+          const d = Math.hypot(agent.x - obj.x, agent.z - obj.z);
+          if (d < 30) count++;
+        }
+        agentCounts.set(obj.id, count);
+      }
+    }
+
     for (const obj of store.objects) {
       const colour = MARKER_COLOURS[obj.type] ?? '#444444';
       const label = obj.type.replace(/_/g, ' ');
@@ -212,19 +230,26 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
           color: colour, weight: 4, opacity: 0.8,
         }).addTo(layer);
       } else {
-        const sizeMap: Record<string, number> = { stage: 22, entrance: 18, exit: 18, emergency_exit: 18 };
-        const sz = sizeMap[obj.type] ?? 14;
+        const sz = getMarkerSize(obj.type);
         const icon = L.divIcon({
           className: 'sim-marker',
-          html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${colour};border:2px solid #000;box-shadow:0 0 8px ${colour}99;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:bold;">${label[0].toUpperCase()}</div>`,
+          html: getMarkerIcon(obj.type, sz),
           iconSize: [sz, sz],
           iconAnchor: [sz / 2, sz / 2],
         });
         const marker = L.marker([obj.lat, obj.lng], { icon }).addTo(layer);
         marker.bindTooltip(`${label} (cap: ${obj.capacity})`, { permanent: false, direction: 'top' });
+
+        const nearby = agentCounts.get(obj.id) ?? 0;
+        const extra: Record<string, string> = {};
+        if (snapshot) {
+          extra['Agents nearby'] = `${nearby}`;
+          extra['Sim tick'] = `${snapshot.tick}`;
+        }
+        marker.bindPopup(getObjectPopupHtml(obj, extra), { closeButton: true, maxWidth: 250 });
       }
     }
-  }, [store.objects, store.mapCenter]);
+  }, [store.objects, store.mapCenter, snapshot]);
 
   // Update agents, density, and incidents when snapshot changes
   useEffect(() => {
@@ -366,65 +391,14 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
 
   return (
     <div className="map-sim">
-      <div className="sim-hud">
-        <div className="sim-hud-top">
-          <div className="sim-title">CrowdFlux Simulation</div>
-          <button className="sim-exit-btn" onClick={onExit}>← Back to Build</button>
+      <div className="sim-sidebar">
+        <div className="sim-sidebar-header">
+          <div className="sim-title">CrowdFlux</div>
+          <div className="sim-subtitle">Live Simulation</div>
         </div>
 
-        {noDataWarning && (
-          <div className="sim-warning">
-            <AlertTriangle size={14} />
-            <span>No data from server — check connection. Make sure the server is running on port 3001.</span>
-          </div>
-        )}
-
-        <div className="sim-stats-bar">
-          <div className="sim-stat">
-            <Users size={14} />
-            <span className="stat-label">Agents</span>
-            <span className="stat-value">{agentCount.toLocaleString()}</span>
-          </div>
-          <div className="sim-stat">
-            <TrendingUp size={14} />
-            <span className="stat-label">Entered</span>
-            <span className="stat-value">{entered.toLocaleString()}</span>
-          </div>
-          <div className="sim-stat">
-            <span className="stat-label">Exited</span>
-            <span className="stat-value">{exited.toLocaleString()}</span>
-          </div>
-          <div className="sim-stat">
-            <Activity size={14} />
-            <span className="stat-label">Max Density</span>
-            <span className="stat-value">{maxDensity.toFixed(1)}</span>
-          </div>
-          <div className="sim-stat">
-            <span className="stat-label">TPS</span>
-            <span className="stat-value">{tps.toFixed(0)}</span>
-          </div>
-          {snapshot?.evacuation && (
-            <div className="sim-stat evac">
-              <AlertTriangle size={14} />
-              <span className="stat-value">EVACUATION</span>
-            </div>
-          )}
-        </div>
-
-        {/* Per-state breakdown */}
-        {agentCount > 0 && (
-          <div className="sim-state-bar">
-            {Object.entries(stateCounts).map(([state, count]) => (
-              <div key={state} className="state-chip" style={{ borderColor: STATE_COLOURS[+state] ?? '#888' }}>
-                <span className="state-dot" style={{ background: STATE_COLOURS[+state] ?? '#888' }}></span>
-                <span>{STATE_LABELS[+state] ?? `State ${state}`}</span>
-                <strong>{count}</strong>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="sim-controls">
+        <div className="sim-sidebar-section">
+          <div className="sim-sidebar-label">Controls</div>
           <button className="sim-btn" onClick={onTogglePause}>
             {paused ? <Play size={14} /> : <Pause size={14} />}
             <span>{paused ? 'Resume' : 'Pause'}</span>
@@ -439,19 +413,101 @@ export function MapSimulation({ snapshot, metrics, paused, onTogglePause, onExit
           </button>
         </div>
 
-        <div className="sim-legend">
-          <div className="legend-item"><span className="legend-dot" style={{ background: '#3a8a5a' }}></span>Entering</div>
-          <div className="legend-item"><span className="legend-dot" style={{ background: '#4a9ad4' }}></span>Moving</div>
-          <div className="legend-item"><span className="legend-dot" style={{ background: '#e5c100' }}></span>Queuing</div>
-          <div className="legend-item"><span className="legend-dot" style={{ background: '#888888' }}></span>At Destination</div>
-          <div className="legend-item"><span className="legend-dot" style={{ background: '#e63946' }}></span>Evacuating</div>
-          <div className="legend-item" style={{ marginLeft: 'auto', opacity: 0.5 }}>
+        <div className="sim-sidebar-section">
+          <div className="sim-sidebar-label">Map Opacity</div>
+          <div className="sim-opacity-control">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.1}
+              value={mapOpacity}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setMapOpacity(v);
+                tileLayerRef.current?.setOpacity(v);
+              }}
+            />
+            <span className="sim-opacity-value">{Math.round(mapOpacity * 100)}%</span>
+          </div>
+        </div>
+
+        <div className="sim-sidebar-section">
+          <div className="sim-sidebar-label">Live Stats</div>
+          <div className="sim-stat-list">
+            <div className="sim-stat-row">
+              <Users size={13} />
+              <span>Agents</span>
+              <strong>{agentCount.toLocaleString()}</strong>
+            </div>
+            <div className="sim-stat-row">
+              <TrendingUp size={13} />
+              <span>Entered</span>
+              <strong>{entered.toLocaleString()}</strong>
+            </div>
+            <div className="sim-stat-row">
+              <span>Exited</span>
+              <strong>{exited.toLocaleString()}</strong>
+            </div>
+            <div className="sim-stat-row">
+              <Activity size={13} />
+              <span>Max Density</span>
+              <strong>{maxDensity.toFixed(1)}</strong>
+            </div>
+            <div className="sim-stat-row">
+              <span>TPS</span>
+              <strong>{tps.toFixed(0)}</strong>
+            </div>
+            {snapshot?.evacuation && (
+              <div className="sim-stat-row evac-row">
+                <AlertTriangle size={13} />
+                <strong>EVACUATION ACTIVE</strong>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {agentCount > 0 && (
+          <div className="sim-sidebar-section">
+            <div className="sim-sidebar-label">Agent States</div>
+            <div className="sim-state-list">
+              {Object.entries(stateCounts).map(([state, count]) => (
+                <div key={state} className="state-chip" style={{ borderColor: STATE_COLOURS[+state] ?? '#888' }}>
+                  <span className="state-dot" style={{ background: STATE_COLOURS[+state] ?? '#888' }}></span>
+                  <span>{STATE_LABELS[+state] ?? `State ${state}`}</span>
+                  <strong>{count}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="sim-sidebar-section">
+          <div className="sim-sidebar-label">Legend</div>
+          <div className="sim-legend-list">
+            <div className="legend-item"><span className="legend-dot" style={{ background: '#3a8a5a' }}></span>Entering</div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: '#4a9ad4' }}></span>Moving</div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: '#e5c100' }}></span>Queuing</div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: '#888888' }}></span>At Destination</div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: '#e63946' }}></span>Evacuating</div>
+          </div>
+        </div>
+
+        <div className="sim-sidebar-footer">
+          <div className="sim-tick-info">
             {snapshot ? `tick ${snapshot.tick} · ${snapshot.agents?.length ?? 0} agents` : 'waiting for data...'}
           </div>
+          <button className="sim-exit-btn" onClick={onExit}>← Back to Build</button>
         </div>
       </div>
 
       <div className="sim-map-wrap">
+        {noDataWarning && (
+          <div className="sim-warning-floating">
+            <AlertTriangle size={14} />
+            <span>No data from server — check connection.</span>
+          </div>
+        )}
         <div id="sim-map" className="sim-map" />
       </div>
     </div>
